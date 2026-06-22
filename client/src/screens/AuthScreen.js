@@ -40,7 +40,6 @@ const InputField = memo(function InputField({
         keyboardType={keyboardType || 'default'}
         autoCapitalize="none"
         autoCorrect={false}
-        blurOnSubmit={false}
         textAlign="right"
       />
     </View>
@@ -49,6 +48,7 @@ const InputField = memo(function InputField({
 
 export default function AuthScreen({ navigation }) {
   const [mode, setMode] = useState('login');
+  const [role, setRole] = useState('customer');
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
 
@@ -57,6 +57,10 @@ export default function AuthScreen({ navigation }) {
     idNumber: '',
     email: '',
     password: '',
+    style: '',
+    phone: '',
+    specialization: '',
+    experience: '',
   });
 
   const updateField = (field, value) => {
@@ -66,15 +70,30 @@ export default function AuthScreen({ navigation }) {
     }));
   };
 
+  const goByRole = (userRole) => {
+    if (userRole === 'designer') {
+      navigation.replace('DesignProfile');
+    } else {
+      navigation.replace('HomeScreen');
+    }
+  };
+
   const handleAuth = async () => {
     if (!formData.email || !formData.password) {
       Alert.alert('Error', 'Please enter email and password');
       return;
     }
 
-    if (mode === 'register' && (!formData.fullName || !formData.idNumber)) {
-      Alert.alert('Error', 'Please fill all fields');
-      return;
+    if (mode === 'register') {
+      if (!formData.fullName) {
+        Alert.alert('Error', 'Please enter full name');
+        return;
+      }
+
+      if (role === 'customer' && !formData.idNumber) {
+        Alert.alert('Error', 'Please enter ID number');
+        return;
+      }
     }
 
     setLoading(true);
@@ -88,6 +107,11 @@ export default function AuthScreen({ navigation }) {
           idNumber: formData.idNumber,
           email: formData.email,
           password: formData.password,
+          role,
+          style: formData.style,
+          phone: formData.phone,
+          specialization: formData.specialization,
+          experience: formData.experience,
         });
 
         Alert.alert('Success', 'Registration successful');
@@ -98,16 +122,15 @@ export default function AuthScreen({ navigation }) {
         });
       }
 
-      console.log('SERVER RESPONSE:', response.data);
-
       if (response.data.user) {
         await login({
           ...response.data.user,
           token: response.data.token,
+          role: response.data.role,
         });
       }
 
-      navigation.replace('Designers');
+      goByRole(response.data.role);
     } catch (error) {
       console.log('AUTH ERROR:', error.response?.data || error.message);
 
@@ -136,8 +159,6 @@ export default function AuthScreen({ navigation }) {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          <View style={styles.topDecoration} />
-
           <View style={styles.logoContainer}>
             <LinearGradient
               colors={['#7C5CFF', '#B86BFF', '#F4B860']}
@@ -150,7 +171,7 @@ export default function AuthScreen({ navigation }) {
           <Text style={styles.appName}>INTERIA</Text>
 
           <Text style={styles.mainTitle}>
-            {mode === 'login' ? 'Welcome Back' : 'Create Your Account'}
+            {mode === 'login' ? 'Welcome Back' : 'Create Account'}
           </Text>
 
           <Text style={styles.subtitle}>
@@ -195,6 +216,44 @@ export default function AuthScreen({ navigation }) {
             </View>
 
             {mode === 'register' && (
+              <View style={styles.roleBox}>
+                <TouchableOpacity
+                  style={[
+                    styles.roleButton,
+                    role === 'customer' && styles.activeRole,
+                  ]}
+                  onPress={() => setRole('customer')}
+                >
+                  <Text
+                    style={[
+                      styles.roleText,
+                      role === 'customer' && styles.activeRoleText,
+                    ]}
+                  >
+                    Customer
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.roleButton,
+                    role === 'designer' && styles.activeRole,
+                  ]}
+                  onPress={() => setRole('designer')}
+                >
+                  <Text
+                    style={[
+                      styles.roleText,
+                      role === 'designer' && styles.activeRoleText,
+                    ]}
+                  >
+                    Designer
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {mode === 'register' && (
               <>
                 <InputField
                   icon="person-outline"
@@ -203,13 +262,48 @@ export default function AuthScreen({ navigation }) {
                   onChangeText={(v) => updateField('fullName', v)}
                 />
 
-                <InputField
-                  icon="id-card-outline"
-                  placeholder="תעודת זהות"
-                  value={formData.idNumber}
-                  keyboardType="numeric"
-                  onChangeText={(v) => updateField('idNumber', v)}
-                />
+                {role === 'customer' && (
+                  <InputField
+                    icon="id-card-outline"
+                    placeholder="תעודת זהות"
+                    value={formData.idNumber}
+                    keyboardType="numeric"
+                    onChangeText={(v) => updateField('idNumber', v)}
+                  />
+                )}
+
+                {role === 'designer' && (
+                  <>
+                    <InputField
+                      icon="color-palette-outline"
+                      placeholder="Style / סגנון עיצוב"
+                      value={formData.style}
+                      onChangeText={(v) => updateField('style', v)}
+                    />
+
+                    <InputField
+                      icon="briefcase-outline"
+                      placeholder="Specialization"
+                      value={formData.specialization}
+                      onChangeText={(v) => updateField('specialization', v)}
+                    />
+
+                    <InputField
+                      icon="time-outline"
+                      placeholder="Experience"
+                      value={formData.experience}
+                      onChangeText={(v) => updateField('experience', v)}
+                    />
+
+                    <InputField
+                      icon="call-outline"
+                      placeholder="Phone"
+                      value={formData.phone}
+                      keyboardType="phone-pad"
+                      onChangeText={(v) => updateField('phone', v)}
+                    />
+                  </>
+                )}
               </>
             )}
 
@@ -243,19 +337,7 @@ export default function AuthScreen({ navigation }) {
                 )}
               </LinearGradient>
             </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.guestButton}
-              onPress={() => navigation.navigate('Designers')}
-            >
-              <Ionicons name="sparkles-outline" size={20} color="#7C5CFF" />
-              <Text style={styles.guestText}>כניסה כאורח וצפייה במעצבים</Text>
-            </TouchableOpacity>
           </View>
-
-          <Text style={styles.footerText}>
-            Find your perfect designer with style
-          </Text>
         </ScrollView>
       </KeyboardAvoidingView>
     </LinearGradient>
@@ -266,24 +348,18 @@ const styles = StyleSheet.create({
   screen: {
     flex: 1,
   },
+
   container: {
     flexGrow: 1,
     padding: 24,
     justifyContent: 'center',
   },
-  topDecoration: {
-    position: 'absolute',
-    top: -80,
-    right: -80,
-    width: 210,
-    height: 210,
-    borderRadius: 105,
-    backgroundColor: 'rgba(124,92,255,0.18)',
-  },
+
   logoContainer: {
     alignSelf: 'center',
     marginBottom: 14,
   },
+
   logo: {
     width: 92,
     height: 92,
@@ -295,8 +371,8 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.35,
     shadowRadius: 18,
     elevation: 12,
-    transform: [{ rotate: '-6deg' }],
   },
+
   appName: {
     textAlign: 'center',
     color: '#7C5CFF',
@@ -305,13 +381,15 @@ const styles = StyleSheet.create({
     letterSpacing: 4,
     marginTop: 8,
   },
+
   mainTitle: {
     textAlign: 'center',
     color: '#1D1A2F',
-    fontSize: 34,
+    fontSize: 32,
     fontWeight: '900',
     marginTop: 8,
   },
+
   subtitle: {
     textAlign: 'center',
     color: '#6E6A7C',
@@ -319,42 +397,78 @@ const styles = StyleSheet.create({
     marginTop: 8,
     marginBottom: 26,
   },
+
   formCard: {
-    backgroundColor: 'rgba(255,255,255,0.88)',
+    backgroundColor: 'rgba(255,255,255,0.9)',
     borderRadius: 34,
     padding: 22,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.9)',
+    borderColor: '#fff',
     shadowColor: '#7C5CFF',
     shadowOffset: { width: 0, height: 18 },
     shadowOpacity: 0.2,
     shadowRadius: 22,
     elevation: 14,
   },
+
   modeBox: {
     flexDirection: 'row-reverse',
     backgroundColor: '#F0ECFF',
     borderRadius: 22,
     padding: 6,
-    marginBottom: 22,
+    marginBottom: 16,
   },
+
   modeButton: {
     flex: 1,
     paddingVertical: 13,
     borderRadius: 17,
     alignItems: 'center',
   },
+
   activeMode: {
     backgroundColor: '#1D1A2F',
   },
+
   modeText: {
     color: '#7B7890',
     fontWeight: '800',
     fontSize: 15,
   },
+
   activeModeText: {
     color: '#fff',
   },
+
+  roleBox: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 16,
+  },
+
+  roleButton: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 18,
+    backgroundColor: '#F5F2FF',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#DED7FF',
+  },
+
+  activeRole: {
+    backgroundColor: '#7C5CFF',
+  },
+
+  roleText: {
+    fontWeight: '900',
+    color: '#7C5CFF',
+  },
+
+  activeRoleText: {
+    color: '#fff',
+  },
+
   inputWrapper: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
@@ -366,6 +480,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#EFEAFB',
   },
+
   iconBox: {
     width: 38,
     height: 38,
@@ -374,51 +489,25 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+
   input: {
     flex: 1,
     fontSize: 15,
     color: '#1D1A2F',
     paddingHorizontal: 12,
   },
+
   primaryButton: {
     height: 58,
     borderRadius: 22,
     justifyContent: 'center',
     alignItems: 'center',
     marginTop: 8,
-    shadowColor: '#7C5CFF',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.35,
-    shadowRadius: 14,
-    elevation: 8,
   },
+
   primaryButtonText: {
     color: '#fff',
     fontSize: 17,
     fontWeight: '900',
-  },
-  guestButton: {
-    height: 54,
-    borderRadius: 20,
-    borderWidth: 1.5,
-    borderColor: '#CFC3FF',
-    justifyContent: 'center',
-    alignItems: 'center',
-    flexDirection: 'row-reverse',
-    gap: 8,
-    marginTop: 14,
-    backgroundColor: '#FBFAFF',
-  },
-  guestText: {
-    color: '#5A42C9',
-    fontSize: 15,
-    fontWeight: '800',
-  },
-  footerText: {
-    textAlign: 'center',
-    color: '#8D8A9B',
-    marginTop: 22,
-    fontSize: 13,
-    fontWeight: '600',
   },
 });

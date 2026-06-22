@@ -15,7 +15,11 @@ import AuthScreen from './src/screens/AuthScreen';
 import AdminLogin from './src/screens/AdminLogin';
 import ProfileScreen from './src/screens/ProfileScreen';
 import SplashScreen from './src/screens/HomeScreen';
+import DesignProfile from './src/screens/DesignerProfile';
+import DesignerMessagesScreen from './src/screens/DesignerMessagesScreen';
+
 const Stack = createStackNavigator();
+
 
 export default function App() {
   return (
@@ -57,6 +61,16 @@ export default function App() {
               name="Splash" 
               component={SplashScreen} 
               options={{ headerShown: false }} 
+            />
+            <Stack.Screen 
+              name="DesignProfile" 
+              component={DesignProfile} 
+              options={{ title: 'פרופיל מעצב' }} 
+            />
+            <Stack.Screen 
+              name="DesignerMessages" 
+              component={DesignerMessagesScreen} 
+              options={{ title: 'הודעות' }} 
             />
           </Stack.Navigator>
         </NavigationContainer>
