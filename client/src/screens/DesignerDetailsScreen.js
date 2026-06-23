@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -14,40 +14,58 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
 import API from '../services/api';
 
 const { width } = Dimensions.get('window');
 
 export default function DesignerDetailsScreen({ route, navigation }) {
-  const { designerId } = route.params;
+  const { user, isLoading: isAuthLoading } = useAuth();
+
+  const designerId = route?.params?.designerId || user?._id;
 
   const [designer, setDesigner] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('אודות');
 
-  const { user, isLoading: isAuthLoading } = useAuth();
-
   useEffect(() => {
     navigation.setOptions({ headerShown: false });
   }, [navigation]);
 
-  useEffect(() => {
-    const loadDesignerDetails = async () => {
-      try {
-        const response = await API.get(`/designers/${designerId}`);
-        setDesigner(response.data);
-      } catch (err) {
-        Alert.alert('שגיאה', 'לא ניתן לטעון את פרטי המעצב.');
-      } finally {
-        setLoading(false);
-      }
-    };
+  const loadDesignerDetails = async () => {
+    if (!designerId) {
+      Alert.alert('Error', 'Designer ID not found');
+      setLoading(false);
+      return;
+    }
 
-    loadDesignerDetails();
-  }, [designerId]);
+    try {
+      setLoading(true);
+
+      const response = await API.get(`/designers/${designerId}`);
+      setDesigner(response.data);
+    } catch (error) {
+      console.log('GET DESIGNER ERROR:', error?.response?.data || error.message);
+
+      Alert.alert(
+        'Error',
+        error?.response?.data?.message || 'Failed to load designer details'
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useFocusEffect(
+    useCallback(() => {
+      loadDesignerDetails();
+    }, [designerId])
+  );
 
   const handleStartChat = () => {
+    if (!designer) return;
+
     if (user) {
       navigation.navigate('Chat', {
         designerId: designer._id,
@@ -55,18 +73,22 @@ export default function DesignerDetailsScreen({ route, navigation }) {
         image: designer.image,
       });
     } else {
-      Alert.alert('כניסה נדרשת', 'עליך להתחבר כדי להתחיל שיחה.', [
-        { text: 'ביטול', style: 'cancel' },
-        { text: 'מעבר להתחברות', onPress: () => navigation.navigate('Auth') },
-      ]);
+      Alert.alert('Login Required', 'You need to login first');
     }
+  };
+
+  const handleEditProfile = () => {
+    navigation.navigate('EditDesignerProfile');
   };
 
   if (loading || isAuthLoading) {
     return (
-      <LinearGradient colors={['#F7F2FF', '#EEF7FF', '#FFF7EC']} style={styles.center}>
+      <LinearGradient
+        colors={['#F7F2FF', '#EEF7FF', '#FFF7EC']}
+        style={styles.center}
+      >
         <ActivityIndicator size="large" color="#7C5CFF" />
-        <Text style={styles.loadingText}>טוען פרטי מעצב...</Text>
+        <Text style={styles.loadingText}>Loading designer details...</Text>
       </LinearGradient>
     );
   }
@@ -74,26 +96,61 @@ export default function DesignerDetailsScreen({ route, navigation }) {
   if (!designer) {
     return (
       <View style={styles.center}>
-        <Text>המעצב לא נמצא</Text>
+        <Text>Designer not found</Text>
       </View>
     );
   }
 
-  const galleryImages = designer.gallery?.length
-    ? designer.gallery
-    : [designer.image, designer.image, designer.image];
+  const galleryImages =
+    designer.gallery?.length > 0
+      ? designer.gallery
+      : designer.image
+      ? [designer.image]
+      : ['https://images.unsplash.com/photo-1600607687920-4e2a09cf159d?q=80&w=900'];
 
   const renderTabContent = () => {
     if (activeTab === 'אודות') {
-      return designer.about || 'אין מידע זמין';
+      return (
+        <View>
+          <InfoRow icon="person-outline" label="Name" value={designer.name} />
+          <InfoRow icon="call-outline" label="Phone" value={designer.phone} />
+          <InfoRow icon="color-palette-outline" label="Style" value={designer.style} />
+          <InfoRow icon="sparkles-outline" label="Specialization" value={designer.specialization} />
+          <InfoRow icon="briefcase-outline" label="Experience" value={designer.experience} />
+
+          <Text style={styles.aboutTitle}>About</Text>
+          <Text style={styles.paragraphText}>
+            {designer.about || 'No information available'}
+          </Text>
+        </View>
+      );
     }
 
     if (activeTab === 'תיק עבודות') {
-      return designer.works?.length ? designer.works.join('\n\n') : 'אין פרויקטים';
+      if (!designer.works?.length) {
+        return <Text style={styles.paragraphText}>No projects available</Text>;
+      }
+
+      return designer.works.map((work, index) => (
+        <Text key={index} style={styles.paragraphText}>
+          • {work}
+        </Text>
+      ));
     }
 
-    return designer.reviews?.length ? designer.reviews.join('\n\n') : 'אין ביקורות';
+    if (!designer.reviews?.length) {
+      return <Text style={styles.paragraphText}>No reviews available</Text>;
+    }
+
+    return designer.reviews.map((review, index) => (
+      <View key={index} style={styles.reviewBox}>
+        <Text style={styles.reviewUser}>{review.user || 'User'}</Text>
+        <Text style={styles.paragraphText}>{review.comment || 'No comment'}</Text>
+      </View>
+    ));
   };
+
+  const isMyProfile = user?._id === designer?._id;
 
   return (
     <LinearGradient colors={['#F7F2FF', '#EEF7FF', '#FFF7EC']} style={styles.bg}>
@@ -121,18 +178,28 @@ export default function DesignerDetailsScreen({ route, navigation }) {
                 <Ionicons name="arrow-back" size={23} color="#fff" />
               </TouchableOpacity>
 
-              <View style={styles.topBadge}>
-                <Ionicons name="sparkles" size={16} color="#F4B860" />
-                <Text style={styles.topBadgeText}>Premium</Text>
-              </View>
+              {isMyProfile && (
+                <TouchableOpacity style={styles.iconButton} onPress={handleEditProfile}>
+                  <Ionicons name="create-outline" size={23} color="#fff" />
+                </TouchableOpacity>
+              )}
             </View>
 
             <View style={styles.heroInfo}>
-              <Image source={{ uri: designer.image }} style={styles.avatar} />
+              <Image
+                source={{
+                  uri:
+                    designer.image ||
+                    'https://images.unsplash.com/photo-1600607687920-4e2a09cf159d?q=80&w=900',
+                }}
+                style={styles.avatar}
+              />
 
               <View style={styles.nameBox}>
                 <Text style={styles.name}>{designer.name}</Text>
-                <Text style={styles.styleText}>{designer.style || 'Luxury Interior Designer'}</Text>
+                <Text style={styles.styleText}>
+                  {designer.specialization || designer.style || 'Interior Designer'}
+                </Text>
 
                 <View style={styles.onlineRow}>
                   <View style={styles.onlineDot} />
@@ -146,7 +213,7 @@ export default function DesignerDetailsScreen({ route, navigation }) {
             <View style={styles.statsRow}>
               <View style={styles.statBox}>
                 <Ionicons name="star" size={20} color="#F4B860" />
-                <Text style={styles.statNumber}>{designer.rating || '4.9'}</Text>
+                <Text style={styles.statNumber}>{designer.rating || 0}</Text>
                 <Text style={styles.statLabel}>Rating</Text>
               </View>
 
@@ -166,12 +233,23 @@ export default function DesignerDetailsScreen({ route, navigation }) {
             <View style={styles.quickInfo}>
               <View style={styles.quickItem}>
                 <MaterialCommunityIcons name="palette-outline" size={22} color="#7C5CFF" />
-                <Text style={styles.quickText}>{designer.style || 'Interior Style'}</Text>
+                <Text style={styles.quickText}>
+                  {designer.style || 'Interior Style'}
+                </Text>
               </View>
 
               <View style={styles.quickItem}>
-                <Ionicons name="shield-checkmark-outline" size={22} color="#28C76F" />
-                <Text style={styles.quickText}>Verified Designer</Text>
+                <Ionicons name="call-outline" size={22} color="#28C76F" />
+                <Text style={styles.quickText}>
+                  {designer.phone || 'No phone number'}
+                </Text>
+              </View>
+
+              <View style={styles.quickItem}>
+                <Ionicons name="briefcase-outline" size={22} color="#B86BFF" />
+                <Text style={styles.quickText}>
+                  {designer.experience || 'No experience added'}
+                </Text>
               </View>
             </View>
 
@@ -199,18 +277,20 @@ export default function DesignerDetailsScreen({ route, navigation }) {
 
             <View style={styles.contentBox}>
               <Text style={styles.contentTitle}>{activeTab}</Text>
-              <Text style={styles.paragraphText}>{renderTabContent()}</Text>
+              {renderTabContent()}
             </View>
 
-            <TouchableOpacity onPress={handleStartChat} activeOpacity={0.9}>
-              <LinearGradient
-                colors={['#7C5CFF', '#B86BFF']}
-                style={styles.chatButton}
-              >
-                <Ionicons name="chatbubble-ellipses" size={22} color="#fff" />
-                <Text style={styles.chatButtonText}>התחל שיחה</Text>
-              </LinearGradient>
-            </TouchableOpacity>
+            {!isMyProfile && (
+              <TouchableOpacity onPress={handleStartChat} activeOpacity={0.9}>
+                <LinearGradient
+                  colors={['#7C5CFF', '#B86BFF']}
+                  style={styles.chatButton}
+                >
+                  <Ionicons name="chatbubble-ellipses" size={22} color="#fff" />
+                  <Text style={styles.chatButtonText}> שליחת הודעה</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            )}
           </View>
         </ScrollView>
       </SafeAreaView>
@@ -218,15 +298,27 @@ export default function DesignerDetailsScreen({ route, navigation }) {
   );
 }
 
+function InfoRow({ icon, label, value }) {
+  return (
+    <View style={styles.infoRow}>
+      <Ionicons name={icon} size={21} color="#7C5CFF" />
+      <View style={styles.infoTextBox}>
+        <Text style={styles.infoLabel}>{label}</Text>
+        <Text style={styles.infoValue}>{value || 'Not added'}</Text>
+      </View>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
-  bg: {
-    flex: 1,
-  },
+  bg: { flex: 1 },
+
   center: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
+
   loadingText: {
     marginTop: 12,
     color: '#1D1A2F',
@@ -237,11 +329,13 @@ const styles = StyleSheet.create({
     height: 360,
     position: 'relative',
   },
+
   heroImage: {
     width,
     height: 360,
     resizeMode: 'cover',
   },
+
   heroOverlay: {
     position: 'absolute',
     left: 0,
@@ -249,6 +343,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     top: 0,
   },
+
   topActions: {
     position: 'absolute',
     top: 18,
@@ -258,6 +353,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
+
   iconButton: {
     width: 46,
     height: 46,
@@ -268,20 +364,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.35)',
   },
-  topBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.92)',
-    paddingHorizontal: 14,
-    paddingVertical: 9,
-    borderRadius: 18,
-    gap: 6,
-  },
-  topBadgeText: {
-    color: '#1D1A2F',
-    fontWeight: '900',
-    fontSize: 13,
-  },
+
   heroInfo: {
     position: 'absolute',
     bottom: 28,
@@ -290,6 +373,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row-reverse',
     alignItems: 'center',
   },
+
   avatar: {
     width: 92,
     height: 92,
@@ -297,28 +381,33 @@ const styles = StyleSheet.create({
     borderWidth: 3,
     borderColor: '#fff',
   },
+
   nameBox: {
     flex: 1,
     marginRight: 14,
     alignItems: 'flex-end',
   },
+
   name: {
     color: '#fff',
     fontSize: 28,
     fontWeight: '900',
     textAlign: 'right',
   },
+
   styleText: {
     color: 'rgba(255,255,255,0.86)',
     marginTop: 5,
     fontWeight: '700',
     textAlign: 'right',
   },
+
   onlineRow: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
     marginTop: 8,
   },
+
   onlineDot: {
     width: 9,
     height: 9,
@@ -326,6 +415,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#28C76F',
     marginLeft: 6,
   },
+
   onlineText: {
     color: '#fff',
     fontSize: 12,
@@ -345,10 +435,12 @@ const styles = StyleSheet.create({
     elevation: 12,
     marginBottom: 28,
   },
+
   statsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
+
   statBox: {
     width: '31%',
     backgroundColor: '#F8F6FF',
@@ -358,22 +450,26 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E7DEFF',
   },
+
   statNumber: {
     color: '#1D1A2F',
     fontSize: 18,
     fontWeight: '900',
     marginTop: 5,
   },
+
   statLabel: {
     color: '#8D88A6',
     fontSize: 12,
     marginTop: 2,
     fontWeight: '800',
   },
+
   quickInfo: {
     marginTop: 16,
     gap: 10,
   },
+
   quickItem: {
     minHeight: 50,
     borderRadius: 20,
@@ -384,6 +480,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 14,
   },
+
   quickText: {
     flex: 1,
     textAlign: 'right',
@@ -399,23 +496,28 @@ const styles = StyleSheet.create({
     padding: 6,
     marginTop: 20,
   },
+
   tabButton: {
     flex: 1,
     paddingVertical: 12,
     borderRadius: 17,
     alignItems: 'center',
   },
+
   activeTabButton: {
     backgroundColor: '#1D1A2F',
   },
+
   tabText: {
     color: '#7B7890',
     fontWeight: '900',
     fontSize: 14,
   },
+
   activeTabText: {
     color: '#fff',
   },
+
   contentBox: {
     backgroundColor: '#FBFAFF',
     borderRadius: 24,
@@ -424,6 +526,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#EEE7FF',
   },
+
   contentTitle: {
     color: '#7C5CFF',
     fontWeight: '900',
@@ -431,12 +534,69 @@ const styles = StyleSheet.create({
     textAlign: 'right',
     marginBottom: 8,
   },
+
   paragraphText: {
     fontSize: 15.5,
     color: '#3A354F',
     textAlign: 'right',
     lineHeight: 27,
     fontWeight: '600',
+  },
+
+  aboutTitle: {
+    color: '#1D1A2F',
+    fontSize: 17,
+    fontWeight: '900',
+    textAlign: 'right',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+
+  infoRow: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
+    padding: 13,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#EEE7FF',
+  },
+
+  infoTextBox: {
+    flex: 1,
+    marginRight: 10,
+  },
+
+  infoLabel: {
+    color: '#8D88A6',
+    fontSize: 12,
+    fontWeight: '800',
+    textAlign: 'right',
+  },
+
+  infoValue: {
+    color: '#1D1A2F',
+    fontSize: 15,
+    fontWeight: '900',
+    textAlign: 'right',
+    marginTop: 2,
+  },
+
+  reviewBox: {
+    backgroundColor: '#fff',
+    borderRadius: 18,
+    padding: 14,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#EEE7FF',
+  },
+
+  reviewUser: {
+    color: '#7C5CFF',
+    fontWeight: '900',
+    textAlign: 'right',
+    marginBottom: 5,
   },
 
   chatButton: {
@@ -453,6 +613,7 @@ const styles = StyleSheet.create({
     shadowRadius: 14,
     elevation: 8,
   },
+
   chatButtonText: {
     color: '#fff',
     fontSize: 18,

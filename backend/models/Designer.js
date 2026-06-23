@@ -1,14 +1,9 @@
-
 import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
 
 const designerSchema = new mongoose.Schema(
   {
-    name: {
-      type: String,
-      required: true,
-      trim: true,
-    },
+    name: { type: String, required: true, trim: true },
 
     email: {
       type: String,
@@ -18,121 +13,45 @@ const designerSchema = new mongoose.Schema(
       trim: true,
     },
 
-    password: {
-      type: String,
-      required: true,
-    },
+    password: { type: String, required: true },
 
-    role: {
-      type: String,
-      default: 'designer',
-    },
+    role: { type: String, default: 'designer' },
+    style: { type: String, default: '' },
+    image: { type: String, default: '' },
+    about: { type: String, default: '' },
+    phone: { type: String, default: '' },
+    address: { type: String, default: '' },
+    experience: { type: String, default: '' },
+    specialization: { type: String, default: '' },
 
-    style: {
-      type: String,
-      default: '',
-    },
+    rating: { type: Number, default: 0, min: 0, max: 5 },
+    isActive: { type: Boolean, default: true },
 
-    image: {
-      type: String,
-      default: '',
-    },
-
-    about: {
-      type: String,
-      default: '',
-    },
-
-    phone: {
-      type: String,
-      default: '',
-    },
-
-    address: {
-      type: String,
-      default: '',
-    },
-
-    experience: {
-      type: String,
-      default: '',
-    },
-
-    specialization: {
-      type: String,
-      default: '',
-    },
-
-    rating: {
-      type: Number,
-      default: 0,
-      min: 0,
-      max: 5,
-    },
-
-    isActive: {
-      type: Boolean,
-      default: true,
-    },
-
-    gallery: [
-      {
-        type: String,
-      },
-    ],
-
-    works: [
-      {
-        type: String,
-      },
-    ],
+    gallery: [{ type: String }],
+    works: [{ type: String }],
 
     reviews: [
       {
-        user: {
-          type: String,
-          default: '',
-        },
-
-        comment: {
-          type: String,
-          default: '',
-        },
-
-        date: {
-          type: Date,
-          default: Date.now,
-        },
+        user: { type: String, default: '' },
+        comment: { type: String, default: '' },
+        date: { type: Date, default: Date.now },
       },
     ],
   },
-  {
-    timestamps: true,
-  }
+  { timestamps: true }
 );
 
-// Hash Password Before Save
-designerSchema.pre('save', async function () {
-  if (!this.isModified('password')) return;
+designerSchema.pre('save', async function (next) {
+  if (!this.isModified('password')) return next();
 
-  this.password = await bcrypt.hash(
-    this.password,
-    10
-  );
+  this.password = await bcrypt.hash(this.password, 10);
+  next();
 });
 
-// Compare Password
-designerSchema.methods.matchPassword =
-  async function (enteredPassword) {
-    return await bcrypt.compare(
-      enteredPassword,
-      this.password
-    );
-  };
+designerSchema.methods.matchPassword = async function (enteredPassword) {
+  return await bcrypt.compare(enteredPassword, this.password);
+};
 
-const Designer = mongoose.model(
-  'Designer',
-  designerSchema
-);
+const Designer = mongoose.model('Designer', designerSchema);
 
 export default Designer;

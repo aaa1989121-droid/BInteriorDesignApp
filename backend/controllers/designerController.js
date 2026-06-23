@@ -1,180 +1,112 @@
 import Designer from '../models/Designer.js';
-import mongoose from 'mongoose';
-import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 
-// Logger
-const logAction = (action, status) => {
-  console.log(
-    `[${new Date().toISOString()}] ${action} | ${status}`
-  );
+const generateToken = (id) => {
+  return jwt.sign({ id }, process.env.JWT_SECRET || 'secret123', {
+    expiresIn: '30d',
+  });
 };
 
-// =======================
-// LOGIN DESIGNER
-// =======================
-export const loginDesigner = async (req, res, next) => {
-  logAction('LOGIN_DESIGNER', 'Initiated');
-
+export const loginDesigner = async (req, res) => {
   try {
     const { email, password } = req.body;
 
     const designer = await Designer.findOne({ email });
 
     if (!designer) {
-      return res.status(404).json({
-        message: 'Designer not found',
-      });
+      return res.status(404).json({ message: 'Designer not found' });
     }
 
-    const validPassword = await bcrypt.compare(
-      password,
-      designer.password
-    );
+    const isMatch = await designer.matchPassword(password);
 
-    if (!validPassword) {
-      return res.status(401).json({
-        message: 'Invalid password',
-      });
+    if (!isMatch) {
+      return res.status(401).json({ message: 'Invalid password' });
     }
-
-    const token = jwt.sign(
-      {
-        designerId: designer._id,
-        role: 'designer',
-      },
-      process.env.JWT_SECRET,
-      {
-        expiresIn: '7d',
-      }
-    );
-
-    logAction('LOGIN_DESIGNER', 'Success');
 
     res.status(200).json({
-      token,
-      designer,
+      _id: designer._id,
+      name: designer.name,
+      email: designer.email,
+      role: designer.role,
+      phone: designer.phone,
+      specialization: designer.specialization,
+      experience: designer.experience,
+      about: designer.about,
+      image: designer.image,
+      token: generateToken(designer._id),
     });
   } catch (error) {
-    next(error);
+    res.status(500).json({ message: 'Login failed' });
   }
 };
 
-// =======================
-// GET ALL DESIGNERS
-// =======================
-export const getAllDesigners = async (req, res, next) => {
-  logAction('GET_ALL_DESIGNERS', 'Initiated');
-
+export const getAllDesigners = async (req, res) => {
   try {
-    const designers = await Designer.find({
-      isActive: true,
-    }).select('-password');
-
-    logAction('GET_ALL_DESIGNERS', 'Success');
-
+    const designers = await Designer.find().select('-password');
     res.status(200).json(designers);
   } catch (error) {
-    next(error);
+    res.status(500).json({ message: 'Failed to get designers' });
   }
 };
 
-// =======================
-// GET DESIGNER BY ID
-// =======================
-export const getDesignerById = async (req, res, next) => {
-  logAction('GET_DESIGNER_BY_ID', 'Initiated');
-
+export const getDesignerById = async (req, res) => {
   try {
-    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
-      return res.status(400).json({
-        message: 'Invalid ID format',
-      });
-    }
-
-    const designer = await Designer.findById(
-      req.params.id
-    ).select('-password');
+    const designer = await Designer.findById(req.params.id).select('-password');
 
     if (!designer) {
-      return res.status(404).json({
-        message: 'Designer not found',
-      });
+      return res.status(404).json({ message: 'Designer not found' });
     }
-
-    logAction('GET_DESIGNER_BY_ID', 'Success');
 
     res.status(200).json(designer);
   } catch (error) {
-    next(error);
+    res.status(500).json({ message: 'Failed to get designer' });
   }
 };
 
-// =======================
-// UPDATE DESIGNER
-// =======================
-export const updateDesigner = async (req, res, next) => {
-  logAction('UPDATE_DESIGNER', 'Initiated');
-
+export const updateDesigner = async (req, res) => {
   try {
-    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
-      return res.status(400).json({
-        message: 'Invalid ID format',
-      });
-    }
+    console.log('PARAMS ID:', req.params.id);
+    console.log('BODY:', req.body);
 
-    const updatedDesigner =
-      await Designer.findByIdAndUpdate(
-        req.params.id,
-        req.body,
-        {
-          new: true,
-          runValidators: true,
-        }
-      ).select('-password');
+    const updatedDesigner = await Designer.findByIdAndUpdate(
+      req.params.id,
+      {
+        name: req.body.name,
+        phone: req.body.phone,
+        specialization: req.body.specialization,
+        experience: req.body.experience,
+        about: req.body.about,
+        image: req.body.image,
+      },
+      {
+        new: true,
+        runValidators: true,
+      }
+    ).select('-password');
 
     if (!updatedDesigner) {
-      return res.status(404).json({
-        message: 'Designer not found',
-      });
+      return res.status(404).json({ message: 'Designer not found' });
     }
-
-    logAction('UPDATE_DESIGNER', 'Success');
 
     res.status(200).json(updatedDesigner);
   } catch (error) {
-    next(error);
+    console.log('UPDATE DESIGNER ERROR:', error);
+    res.status(500).json({ message: error.message });
   }
 };
 
-// =======================
-// DELETE DESIGNER
-// =======================
-export const deleteDesigner = async (req, res, next) => {
-  logAction('DELETE_DESIGNER', 'Initiated');
-
+export const deleteDesigner = async (req, res) => {
   try {
-    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
-      return res.status(400).json({
-        message: 'Invalid ID format',
-      });
+    const designer = await Designer.findById(req.params.id);
+
+    if (!designer) {
+      return res.status(404).json({ message: 'Designer not found' });
     }
 
-    const deletedDesigner =
-      await Designer.findByIdAndDelete(req.params.id);
+    await designer.deleteOne();
 
-    if (!deletedDesigner) {
-      return res.status(404).json({
-        message: 'Designer not found',
-      });
-    }
-
-    logAction('DELETE_DESIGNER', 'Success');
-
-    res.status(200).json({
-      message: 'Designer deleted successfully',
-    });
+    res.status(200).json({ message: 'Designer deleted successfully' });
   } catch (error) {
-    next(error);
+    res.status(500).json({ message: 'Failed to delete designer' });
   }
 };

@@ -82,7 +82,7 @@ export default function DesignerCard({
               style={styles.chatGradient}
             >
               <Ionicons name="chatbubble-ellipses-outline" size={18} color="#fff" />
-              <Text style={styles.chatText}>שיחה</Text>
+              <Text style={styles.chatText}>שליחת הודעה</Text>
             </LinearGradient>
           </TouchableOpacity>
         </View>
