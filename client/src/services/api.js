@@ -3,7 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // تأكدي أن هذا الـ IP هو نفس عنوان الـ IP المكتوب في التيرمنال الخاص بالـ Client
 const API = axios.create({ 
-    baseURL: 'http://10.69.1.82:5000/api' 
+    baseURL: 'http://172.20.10.4:5000/api' 
 });
 
 API.interceptors.request.use(async (req) => {

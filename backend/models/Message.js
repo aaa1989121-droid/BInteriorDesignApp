@@ -1,4 +1,3 @@
-
 import mongoose from 'mongoose';
 
 const messageSchema = new mongoose.Schema(
@@ -6,6 +5,11 @@ const messageSchema = new mongoose.Schema(
     senderId: {
       type: mongoose.Schema.Types.ObjectId,
       required: true,
+    },
+
+    senderName: {
+      type: String,
+      default: '',
     },
 
     senderRole: {
@@ -19,6 +23,11 @@ const messageSchema = new mongoose.Schema(
       required: true,
     },
 
+    receiverName: {
+      type: String,
+      default: '',
+    },
+
     receiverRole: {
       type: String,
       enum: ['customer', 'designer'],
@@ -30,11 +39,16 @@ const messageSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
+    image: {
+  type: String,
+  default: '',
+},
 
     isRead: {
       type: Boolean,
       default: false,
     },
+    
   },
   {
     timestamps: true,

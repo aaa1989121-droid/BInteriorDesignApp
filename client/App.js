@@ -17,7 +17,7 @@ import ProfileScreen from './src/screens/ProfileScreen';
 import SplashScreen from './src/screens/HomeScreen';
 import DesignProfile from './src/screens/DesignerProfile';
 import DesignerMessagesScreen from './src/screens/DesignerMessagesScreen';
-
+import EditDesignerProfileScreen from './src/screens/EditDesignerProfileScreen';
 const Stack = createStackNavigator();
 
 
@@ -71,6 +71,11 @@ export default function App() {
               name="DesignerMessages" 
               component={DesignerMessagesScreen} 
               options={{ title: 'הודעות' }} 
+            />
+            <Stack.Screen 
+              name="EditDesignerProfile" 
+              component={EditDesignerProfileScreen} 
+              options={{ title: 'עריכת פרופיל' }} 
             />
           </Stack.Navigator>
         </NavigationContainer>

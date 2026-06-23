@@ -23,25 +23,41 @@ const InputField = memo(function InputField({
   onChangeText,
   secure,
   keyboardType,
+  error,
 }) {
   return (
-    <View style={styles.inputWrapper}>
-      <View style={styles.iconBox}>
-        <Ionicons name={icon} size={20} color="#7C5CFF" />
+    <View style={{ marginBottom: error ? 6 : 14 }}>
+      <View
+        style={[
+          styles.inputWrapper,
+          error && styles.inputWrapperError,
+        ]}
+      >
+        <View style={styles.iconBox}>
+          <Ionicons
+            name={icon}
+            size={20}
+            color={error ? '#FF4D4F' : '#7C5CFF'}
+          />
+        </View>
+
+        <TextInput
+          style={styles.input}
+          placeholder={placeholder}
+          placeholderTextColor="#8D8A9B"
+          value={value}
+          onChangeText={onChangeText}
+          secureTextEntry={secure}
+          keyboardType={keyboardType || 'default'}
+          autoCapitalize="none"
+          autoCorrect={false}
+          textAlign="right"
+        />
       </View>
 
-      <TextInput
-        style={styles.input}
-        placeholder={placeholder}
-        placeholderTextColor="#8D8A9B"
-        value={value}
-        onChangeText={onChangeText}
-        secureTextEntry={secure}
-        keyboardType={keyboardType || 'default'}
-        autoCapitalize="none"
-        autoCorrect={false}
-        textAlign="right"
-      />
+      {error ? (
+        <Text style={styles.errorText}>{error}</Text>
+      ) : null}
     </View>
   );
 });
@@ -51,6 +67,8 @@ export default function AuthScreen({ navigation }) {
   const [role, setRole] = useState('customer');
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
+
+  const [errors, setErrors] = useState({});
 
   const [formData, setFormData] = useState({
     fullName: '',
@@ -68,32 +86,56 @@ export default function AuthScreen({ navigation }) {
       ...prev,
       [field]: value,
     }));
+
+    setErrors((prev) => ({
+      ...prev,
+      [field]: '',
+      server: '',
+    }));
   };
 
   const goByRole = (userRole) => {
     if (userRole === 'designer') {
       navigation.replace('DesignProfile');
     } else {
-      navigation.replace('HomeScreen');
+      navigation.replace('Designers');
     }
   };
 
-  const handleAuth = async () => {
-    if (!formData.email || !formData.password) {
-      Alert.alert('Error', 'Please enter email and password');
-      return;
-    }
+  const validateForm = () => {
+    const newErrors = {};
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
     if (mode === 'register') {
-      if (!formData.fullName) {
-        Alert.alert('Error', 'Please enter full name');
-        return;
+      if (!formData.fullName.trim()) {
+        newErrors.fullName = 'Full name is required';
       }
 
-      if (role === 'customer' && !formData.idNumber) {
-        Alert.alert('Error', 'Please enter ID number');
-        return;
+      if (role === 'customer' && !formData.idNumber.trim()) {
+        newErrors.idNumber = 'ID number is required';
       }
+    }
+
+    if (!formData.email.trim()) {
+      newErrors.email = 'Email is required';
+    } else if (!emailRegex.test(formData.email.trim())) {
+      newErrors.email = 'Invalid email format';
+    }
+
+    if (!formData.password.trim()) {
+      newErrors.password = 'Password is required';
+    } else if (formData.password.length < 2) {
+      newErrors.password = 'Password is too short';
+    }
+
+    setErrors(newErrors);
+
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleAuth = async () => {
+    if (!validateForm()) {
+      return;
     }
 
     setLoading(true);
@@ -103,9 +145,9 @@ export default function AuthScreen({ navigation }) {
 
       if (mode === 'register') {
         response = await API.post('/auth/register', {
-          fullName: formData.fullName,
-          idNumber: formData.idNumber,
-          email: formData.email,
+          fullName: formData.fullName.trim(),
+          idNumber: formData.idNumber.trim(),
+          email: formData.email.trim().toLowerCase(),
           password: formData.password,
           role,
           style: formData.style,
@@ -117,7 +159,7 @@ export default function AuthScreen({ navigation }) {
         Alert.alert('Success', 'Registration successful');
       } else {
         response = await API.post('/auth/login', {
-          email: formData.email,
+          email: formData.email.trim().toLowerCase(),
           password: formData.password,
         });
       }
@@ -132,14 +174,21 @@ export default function AuthScreen({ navigation }) {
 
       goByRole(response.data.role);
     } catch (error) {
-      console.log('AUTH ERROR:', error.response?.data || error.message);
-
-      Alert.alert(
-        'Error',
-        error.response?.data?.message ||
-          error.response?.data?.error ||
-          'Server Error'
+      console.log(
+        'AUTH ERROR:',
+        error.response?.data || error.message
       );
+
+      const message =
+        error.response?.data?.message ||
+        error.response?.data?.error ||
+        'Something went wrong';
+
+      setErrors({
+        server: message,
+      });
+
+      Alert.alert('Error', message);
     } finally {
       setLoading(false);
     }
@@ -164,7 +213,11 @@ export default function AuthScreen({ navigation }) {
               colors={['#7C5CFF', '#B86BFF', '#F4B860']}
               style={styles.logo}
             >
-              <MaterialCommunityIcons name="floor-plan" size={42} color="#fff" />
+              <MaterialCommunityIcons
+                name="floor-plan"
+                size={42}
+                color="#fff"
+              />
             </LinearGradient>
           </View>
 
@@ -185,7 +238,10 @@ export default function AuthScreen({ navigation }) {
                   styles.modeButton,
                   mode === 'login' && styles.activeMode,
                 ]}
-                onPress={() => setMode('login')}
+                onPress={() => {
+                  setMode('login');
+                  setErrors({});
+                }}
               >
                 <Text
                   style={[
@@ -202,7 +258,10 @@ export default function AuthScreen({ navigation }) {
                   styles.modeButton,
                   mode === 'register' && styles.activeMode,
                 ]}
-                onPress={() => setMode('register')}
+                onPress={() => {
+                  setMode('register');
+                  setErrors({});
+                }}
               >
                 <Text
                   style={[
@@ -215,6 +274,19 @@ export default function AuthScreen({ navigation }) {
               </TouchableOpacity>
             </View>
 
+            {errors.server ? (
+              <View style={styles.serverErrorBox}>
+                <Ionicons
+                  name="alert-circle-outline"
+                  size={20}
+                  color="#FF4D4F"
+                />
+                <Text style={styles.serverErrorText}>
+                  {errors.server}
+                </Text>
+              </View>
+            ) : null}
+
             {mode === 'register' && (
               <View style={styles.roleBox}>
                 <TouchableOpacity
@@ -222,7 +294,10 @@ export default function AuthScreen({ navigation }) {
                     styles.roleButton,
                     role === 'customer' && styles.activeRole,
                   ]}
-                  onPress={() => setRole('customer')}
+                  onPress={() => {
+                    setRole('customer');
+                    setErrors({});
+                  }}
                 >
                   <Text
                     style={[
@@ -239,7 +314,10 @@ export default function AuthScreen({ navigation }) {
                     styles.roleButton,
                     role === 'designer' && styles.activeRole,
                   ]}
-                  onPress={() => setRole('designer')}
+                  onPress={() => {
+                    setRole('designer');
+                    setErrors({});
+                  }}
                 >
                   <Text
                     style={[
@@ -259,6 +337,7 @@ export default function AuthScreen({ navigation }) {
                   icon="person-outline"
                   placeholder="שם מלא"
                   value={formData.fullName}
+                  error={errors.fullName}
                   onChangeText={(v) => updateField('fullName', v)}
                 />
 
@@ -267,6 +346,7 @@ export default function AuthScreen({ navigation }) {
                     icon="id-card-outline"
                     placeholder="תעודת זהות"
                     value={formData.idNumber}
+                    error={errors.idNumber}
                     keyboardType="numeric"
                     onChangeText={(v) => updateField('idNumber', v)}
                   />
@@ -285,14 +365,18 @@ export default function AuthScreen({ navigation }) {
                       icon="briefcase-outline"
                       placeholder="Specialization"
                       value={formData.specialization}
-                      onChangeText={(v) => updateField('specialization', v)}
+                      onChangeText={(v) =>
+                        updateField('specialization', v)
+                      }
                     />
 
                     <InputField
                       icon="time-outline"
                       placeholder="Experience"
                       value={formData.experience}
-                      onChangeText={(v) => updateField('experience', v)}
+                      onChangeText={(v) =>
+                        updateField('experience', v)
+                      }
                     />
 
                     <InputField
@@ -311,6 +395,7 @@ export default function AuthScreen({ navigation }) {
               icon="mail-outline"
               placeholder="אימייל"
               value={formData.email}
+              error={errors.email}
               keyboardType="email-address"
               onChangeText={(v) => updateField('email', v)}
             />
@@ -319,11 +404,16 @@ export default function AuthScreen({ navigation }) {
               icon="lock-closed-outline"
               placeholder="סיסמה"
               value={formData.password}
+              error={errors.password}
               secure
               onChangeText={(v) => updateField('password', v)}
             />
 
-            <TouchableOpacity onPress={handleAuth} disabled={loading}>
+            <TouchableOpacity
+              onPress={handleAuth}
+              disabled={loading}
+              activeOpacity={0.9}
+            >
               <LinearGradient
                 colors={['#7C5CFF', '#B86BFF']}
                 style={styles.primaryButton}
@@ -475,10 +565,14 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderRadius: 20,
     paddingHorizontal: 12,
-    marginBottom: 14,
     minHeight: 58,
     borderWidth: 1,
     borderColor: '#EFEAFB',
+  },
+
+  inputWrapperError: {
+    borderColor: '#FF4D4F',
+    backgroundColor: '#FFF7F7',
   },
 
   iconBox: {
@@ -495,6 +589,34 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: '#1D1A2F',
     paddingHorizontal: 12,
+  },
+
+  errorText: {
+    color: '#FF4D4F',
+    fontSize: 12,
+    fontWeight: '700',
+    textAlign: 'right',
+    marginTop: 5,
+    marginRight: 10,
+  },
+
+  serverErrorBox: {
+    backgroundColor: '#FFF1F1',
+    borderColor: '#FFB8B8',
+    borderWidth: 1,
+    borderRadius: 16,
+    padding: 12,
+    marginBottom: 14,
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 8,
+  },
+
+  serverErrorText: {
+    flex: 1,
+    color: '#FF4D4F',
+    fontWeight: '800',
+    textAlign: 'right',
   },
 
   primaryButton: {

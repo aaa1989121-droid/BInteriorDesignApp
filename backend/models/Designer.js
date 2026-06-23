@@ -1,3 +1,4 @@
+
 import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
 
@@ -62,21 +63,6 @@ const designerSchema = new mongoose.Schema(
       default: '',
     },
 
-    facebook: {
-      type: String,
-      default: '',
-    },
-
-    instagram: {
-      type: String,
-      default: '',
-    },
-
-    linkedin: {
-      type: String,
-      default: '',
-    },
-
     rating: {
       type: Number,
       default: 0,
@@ -88,6 +74,12 @@ const designerSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
+
+    gallery: [
+      {
+        type: String,
+      },
+    ],
 
     works: [
       {
@@ -121,18 +113,26 @@ const designerSchema = new mongoose.Schema(
 
 // Hash Password Before Save
 designerSchema.pre('save', async function () {
-  if (!this.isModified('password')) {
-    return;
-  }
+  if (!this.isModified('password')) return;
 
-  this.password = await bcrypt.hash(this.password, 10);
+  this.password = await bcrypt.hash(
+    this.password,
+    10
+  );
 });
 
 // Compare Password
-designerSchema.methods.matchPassword = async function (enteredPassword) {
-  return await bcrypt.compare(enteredPassword, this.password);
-};
+designerSchema.methods.matchPassword =
+  async function (enteredPassword) {
+    return await bcrypt.compare(
+      enteredPassword,
+      this.password
+    );
+  };
 
-const Designer = mongoose.model('Designer', designerSchema);
+const Designer = mongoose.model(
+  'Designer',
+  designerSchema
+);
 
 export default Designer;

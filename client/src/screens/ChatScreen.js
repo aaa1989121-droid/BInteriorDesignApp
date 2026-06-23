@@ -70,43 +70,52 @@ export default function ChatScreen({ route, navigation }) {
     }
   };
 
-  const sendMessage = async () => {
-    if (!message.trim()) return;
+ const sendMessage = async () => {
+  if (!message.trim()) return;
 
-    if (!currentUserId || !otherUserId) {
-      Alert.alert('Error', 'Missing chat user data');
-      return;
-    }
+  if (!currentUserId || !otherUserId) {
+    Alert.alert('Error', 'Missing chat user data');
+    return;
+  }
 
-    try {
-      setSending(true);
+  try {
+    setSending(true);
 
-      const response = await API.post('/messages', {
-        senderId: currentUserId,
-        senderRole: currentRole,
+    const response = await API.post('/messages', {
+      senderId: currentUserId,
+      senderName: user?.fullName || user?.name || 'User',
 
-        receiverId: otherUserId,
-        receiverRole: otherRole,
+      senderRole: currentRole,
 
-        text: message.trim(),
-      });
+      receiverId: otherUserId,
+      receiverName: name || 'User',
 
-      setChatMessages((prev) => [...prev, response.data]);
-      setMessage('');
-    } catch (error) {
-      console.log(
-        'SEND MESSAGE ERROR:',
-        error.response?.data || error.message
-      );
+      receiverRole: otherRole,
 
-      Alert.alert(
-        'Error',
-        error.response?.data?.message || 'Failed to send message'
-      );
-    } finally {
-      setSending(false);
-    }
-  };
+      text: message,
+    });
+
+    setChatMessages((prev) => [
+      ...prev,
+      response.data,
+    ]);
+
+    setMessage('');
+  } catch (error) {
+    console.log(
+      'SEND MESSAGE ERROR:',
+      error.response?.data || error.message
+    );
+
+    Alert.alert(
+      'Error',
+      error.response?.data?.message ||
+        'Failed to send message'
+    );
+  } finally {
+    setSending(false);
+  }
+};
 
   const formatTime = (date) => {
     if (!date) return '';
